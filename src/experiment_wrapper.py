@@ -50,17 +50,21 @@ class CustomSimulationExperiment(SimulationExperiment):
     def datasets_pkdata(self) -> Dict[str, DataSet]:
         """ creates datasets from pkdata object."""
         datasets = {}
-        print(self.pkdata)
-        for label, df in self.pkdata.timecourses.df.groupby("label"):
+        pkdata = self.pkdata()
+        if not self.substance_details:
+            substance_details = {}
+        else:
+            substance_details = self.substance_details
+        for label, df in pkdata.timecourses.df.groupby("label"):
 
-            this_pkdata = self.pkdata.filter(
+            this_pkdata = pkdata.filter(
                 {
                 "timecourses": {"label": label},
                 "outputs": {"measurement_type": "concentration"}})
             print(this_pkdata)
 
 
-            meta_analysis = MetaAnalysis(this_pkdata, intervention_substances=set(self.substance_details.keys()))
+            meta_analysis = MetaAnalysis(this_pkdata, intervention_substances=set(substance_details.keys()))
             meta_analysis.create_results()
             results = meta_analysis.results
             for key, add_func in {"genotype": add_genotype, "phenotype": add_phenotype}.items():
@@ -101,7 +105,6 @@ class CustomSimulationExperiment(SimulationExperiment):
             elif df.substance.unique()[0] == "dor":
                 dset.unit_conversion("value", 1 / self.Mr.dor)
             datasets[label] = dset
-        print(datasets.keys())
         return datasets
 
     def simulation_pkdata(self) -> Dict[str, TimecourseSim]:
