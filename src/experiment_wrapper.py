@@ -1,6 +1,5 @@
 from pathlib import Path
 from typing import Dict, Optional
-from pydantic import BaseModel, validator
 from dataclasses import dataclass
 from pkdb_analysis.filter import pk_info
 from pkdb_analysis.meta_analysis import MetaAnalysis
@@ -33,17 +32,19 @@ def add_phenotype(df):
 
 
 class CustomSimulationExperiment(SimulationExperiment):
+
     def __init__(self, pkdata_path: Path, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.pkdata = PKData.from_archive(pkdata_path).filter({"outputs": {"study_name": self.sid}})
         self.substance_details: Dict[str: Substance] = None
         self.tasks_pkdata: Optional[Dict] = None
+        self.pkdata_path = pkdata_path
 
-    # @validator('pkdata')
-    # def pkdata_not_empty(cls, pkdata):
-    #     if len(pkdata.study_names) == 0:
-    #         raise ValueError('PKdata does not contain your study.')
-    #     return pkdata
+
+    def pkdata(self):
+        pkdata = PKData.from_archive(self.pkdata_path).filter({"outputs": {"study_name": self.__class__.__name__}})
+        pkdata.scatters = pkdata.scatters._emptify()
+        return pkdata
+
 
 
     def datasets_pkdata(self) -> Dict[str, DataSet]:
