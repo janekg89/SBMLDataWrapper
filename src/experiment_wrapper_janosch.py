@@ -100,8 +100,6 @@ class PKDataSimulationExperiment(DexSimulationExperiment):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.sid = kwargs["sid"]
-        print(kwargs)
-        print(self)
         # load data
         self.pkdata_raw: PKData = PKData.from_archive(PKDATA_ZIP_PATH).filter({"outputs": {"study_name": self.sid}})
         self.tcs: PKDataFrame = self.pkdata_raw.timecourses
@@ -114,8 +112,6 @@ class PKDataSimulationExperiment(DexSimulationExperiment):
         self.add_group_data()
         self.add_interventions()
 
-        print(self.ops.keys())
-
         self.dsets: Dict[str, DataSet] = self.datasets_from_pkdata()
 
         # manipulation on dsets
@@ -125,10 +121,38 @@ class PKDataSimulationExperiment(DexSimulationExperiment):
         self.simulation_tasks = self.set_simulation_tasks()
 
         # FIXME: docu says nono
-        self.initialize()  # this should be redundant when each experiment is realsed as one single instance of the same class
+        self.pre_initialize()  # this should be redundant when each experiment is realsed as one single instance of the same class
+
+        print(self)
 
         self.fit_mappings = self.set_fit_mappings()
         self.plots = {}
+
+        self.finalize()
+
+    def pre_initialize(self) -> None:
+        """Pre-initialize SimulationExperiment.
+
+        Initialization must be separated from object construction due to
+        the parallel execution of the problem later on.
+        Certain objects cannot be serialized and must be initialized.
+        :return:
+        """
+        # process all information necessary to run the simulations, i.e.,
+        # all data required from the model
+        self._datasets = self.dsets             # storage of datasets
+        self._simulations = self.simulation_tasks  # storage of simulation definition
+        self._tasks = {}
+        self._fit_mappings = {}                 # type: Dict[str, FitMapping]
+        self.datagenerators()                   # definition of data accessed later on (sets self._data)
+
+        # validation of information
+        self._check_keys()
+        self._check_types()
+
+    def finalize(self) -> None:
+        self.pre_initialize()       # update dsets etc
+        self._fit_mappings = self.fit_mappings
 
     def get_dsets(self):
         return self.dsets
@@ -178,26 +202,18 @@ class PKDataSimulationExperiment(DexSimulationExperiment):
         # TODO: adapt and enncapulate; all_udict as global parameter in separate file? see sbmlsim.data.py
         all_udict: Dict[str, str] = {}
         for key in dset.keys():
-            print(key)
             key = str(key)
             # handle '*_unit columns'
             if key.endswith("_unit"):
                 # parse the item and unit in dict
-                units = dset[key].unique()
-                if len(units) > 1:
-                    logger.error(
-                        f"Column '{key}' units are not unique: '{units}' in \n" f"{dset}"
-                    )
-                elif len(units) == 0:
-                    logger.error(f"Column '{key}' units are missing: '{units}'")
-                    print(dset.head())
-                item_key = key[0:-5]
-                if item_key not in dset.columns:
+                units = dset[key]
+                item_key = key[0:-5]            # remove "_unit"
+                if item_key not in dset.keys():
                     logger.error(
                         f"Missing * column '{item_key}' for unit " f"column: '{key}'"
                     )
                 else:
-                    all_udict[item_key] = units[0]
+                    all_udict[item_key] = str(units)
         d = DataSet(dset)
         d.uinfo = UnitsInformation(all_udict, ureg=self.ureg)  # TODO: add all_udict
         d.Q_ = d.uinfo.ureg.Quantity
@@ -365,6 +381,9 @@ class PKDataSimulationExperiment(DexSimulationExperiment):
             }
 
             tcsims[id] = TimecourseSim(timecourses=Timecourse(**task_dict))
+            for key, dset in self.dsets.items():
+                if(dset["interventions"][0]==str(intervention)):
+                    dset["task"] = id
         return tcsims
 
     def set_fit_mappings(self) -> Dict[str, FitMapping]:
@@ -373,34 +392,32 @@ class PKDataSimulationExperiment(DexSimulationExperiment):
         """
         mappings = {}
         for key, dset in self.dsets.items():
-            assert len(dset['tissue'].unique()) == 1
-            tissue = dset['tissue']
-            task_yid = dset['yid']
 
+            # TODO: encapsulate -> utils
+            meta_data_dict = {
+                "diplotype": None,
+                "tissue":  None,
+                "diplotypic_phenotype": None,
+                "metabolic_phenotype": None,
+                "quinidine": False,
+                "inhibition": False,
+            }
+            for meta_data_entry, item in meta_data_dict.items():
+                if meta_data_entry in dset.columns:
+                    assert len(dset[meta_data_entry].unique()) == 1
+                    meta_data_dict[meta_data_entry] = dset[meta_data_entry][0]
+            for intervention in dset['interventions'].unique():
+                if "qui" in intervention:
+                    meta_data_dict["quinidine"] = True
+            # FIXME: for now inhibition is always false
+
+            # TODO: encapsulate -> utils
             if "mean" in dset.keys():
                 measured_yid = "mean"
             elif "value" in dset.key():
                 measured_yid = "value"
             else:
                 raise ValueError("Unexpected reporting type in dset.")
-
-            print(self)
-            print(self.datasets().keys())
-            print(key)
-
-            print(type(self.dsets[key]))
-
-            print(self.datasets()["PM_pm_dtf-plus-dtfglu_plasma_DEXHBr30mg"].uinfo)
-
-            test = FitData(
-                experiment=self,
-                dataset=key,
-                xid="time",
-                yid=measured_yid,
-                count="count"
-            )
-
-            print(test)
 
             mappings[f"fm_{key}"] = FitMapping(
                 self,
@@ -413,72 +430,14 @@ class PKDataSimulationExperiment(DexSimulationExperiment):
                 ),
                 observable=FitData(
                     self,
-                    task="task_po30",  # TODO: map from key, interventions ...?
+                    task=f"task_{dset['task']}",
                     xid="time",
-                    yid=task_yid  # TODO: get from dset (create function: measurement type -> str)
+                    yid=dset['yid']
                 ),
-                metadata=DexMappingMetaData(
-                    diplotype=None,  # TODO: get from dset
-                    tissue=tissue,  # TODO: get from dset
-                    diplotypic_phenotype=None,  # TODO: get from dset
-                    metabolic_phenotype="PM",  # TODO: get from dset
-                    quinidine=False,  # TODO: get from dset
-                    inhibition=False,  # TODO: get from dset
-                )
+                metadata=DexMappingMetaData(**meta_data_dict)
             )
         return mappings
 
-
-def from_csv(experiment: DexSimulationExperiment, fig_ids: List[str], **kwargs) -> Dict[
-    str, DataSet]:
-    # TODO:
-    #   - Load info from study.json -> map intervention to dose
-    #       - intervention: substance, dose [x]
-    #       - group: phenotype [ ]
-
-    # generate dicts for specified figures/tables (split by substance)
-    sheets = {}
-    for fig_id in fig_ids:
-        dframes = load_pkdb_dataframes_by_substance(f"{experiment.sid}_{fig_id}", data_path=experiment.data_path)
-        sheets[f"{fig_id}"] = dframes
-
-    # iterate over sheets
-    dsets = {}
-    sheet: Dict[str, DataFrame]
-    for sheet_id, sheet in sheets.items():
-        # iterate over substances substance
-        for substance, df in sheet.items():
-            if substance in key_mapping.keys():
-                d = {f"{sheet_id}_{key_mapping[substance]}": DataSet.from_df(df, experiment.ureg)}
-            else:
-                warnings.warn(f"{substance} not in mapping keys")
-                continue
-                # d = {f"{sheet_id}_{substance}": DataSet.from_df(df, experiment.ureg)}
-            # split each data frame in single time-courses
-            for split_key in ["group", "id", "measurement", "tissue", "intervention"]:
-                d = split_dataset(experiment, d, split_key)
-                # TODO: remove empty columns (including key)
-            # TODO: remove empty datasets
-            dsets.update(d)
-
-    # convert units to molar
-    dset: DataSet
-    for key, dset in dsets.items():
-        convert_units(experiment, dset)
-    return dsets
-
-
-def split_dataset(experiment, dsets: Dict[str, DataSet], split_key: str) -> Dict[str, DataSet]:
-    dsets_split = {}
-    for key, dset in dsets.items():
-        if split_key in dset.columns.values:
-            for splitter in getattr(dset, split_key).unique():
-                name = dataset_name(experiment, splitter, split_key)
-                dsets_split[f"{key}_{name}"] = DataSet.from_df(dset[getattr(dset, split_key) == splitter],
-                                                               experiment.ureg)
-        else:
-            return dsets
-    return dsets_split
 
 
 def dataset_name(experiment, splitter: str, split_key: str) -> str:
