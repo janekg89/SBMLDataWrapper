@@ -1,3 +1,4 @@
+from pkdb_models.models.dextromethorphan.helpers import run_experiments
 from pydantic.dataclasses import dataclass
 from experiment_wrapper_janosch import PKDataSimulationExperiment
 
@@ -12,4 +13,4 @@ if __name__ == "__main__":
     test: PKDataSimulationExperiment = PKDataSimulationExperiment(sid=Capon1996.sid)
     print(test)
 
-    # run_experiments(Capon1996, output_dir="test")
+    #run_experiments(Capon1996, output_dir="test")

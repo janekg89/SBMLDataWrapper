@@ -8,6 +8,10 @@ from typing import Dict, List
 import coloredlogs
 import numpy as np
 import pandas as pd
+from pkdb_models.models.dextromethorphan.experiments.figure_templates import fig_dex_dor_plasma
+from pkdb_models.models.dextromethorphan.experiments.genotype_phenotype import colors_phenotype
+from sbmlsim.plot import Figure, Axis
+
 import utils
 from pandas import DataFrame
 from pint import Quantity
@@ -21,8 +25,6 @@ from sbmlsim.units import UnitsInformation
 from pkdb_models.models.dextromethorphan import PKDATA_ZIP_PATH
 from pkdb_models.models.dextromethorphan.experiments.base_experiment import DexSimulationExperiment, DexMappingMetaData
 from pkdb_analysis.data import PKData, PKDataFrame
-
-
 
 coloredlogs.install(
     level="INFO",
@@ -93,9 +95,10 @@ key_mapping = {
 }
 
 
-# TODO:     inheritance seems not well structured for me.
-#           Maybe DexSimulationExperiment(PKDataSimulationExperiment)
-#           and PKDataSimulationExperiment(SimulationExperiment would be better)
+# TODO: - Inheritance seems not well structured for me.
+#         Maybe DexSimulationExperiment(PKDataSimulationExperiment)
+#         and PKDataSimulationExperiment(SimulationExperiment would be better)
+#       - Add automatic unit conversion
 class PKDataSimulationExperiment(DexSimulationExperiment):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -126,7 +129,7 @@ class PKDataSimulationExperiment(DexSimulationExperiment):
         print(self)
 
         self.fit_mappings = self.set_fit_mappings()
-        self.plots = {}
+        self.plots = self.set_figures()
 
         self.finalize()
 
@@ -140,18 +143,18 @@ class PKDataSimulationExperiment(DexSimulationExperiment):
         """
         # process all information necessary to run the simulations, i.e.,
         # all data required from the model
-        self._datasets = self.dsets             # storage of datasets
+        self._datasets = self.dsets  # storage of datasets
         self._simulations = self.simulation_tasks  # storage of simulation definition
         self._tasks = {}
-        self._fit_mappings = {}                 # type: Dict[str, FitMapping]
-        self.datagenerators()                   # definition of data accessed later on (sets self._data)
+        self._fit_mappings = {}  # type: Dict[str, FitMapping]
+        self.datagenerators()  # definition of data accessed later on (sets self._data)
 
         # validation of information
         self._check_keys()
         self._check_types()
 
     def finalize(self) -> None:
-        self.pre_initialize()       # update dsets etc
+        self.pre_initialize()  # update dsets etc
         self._fit_mappings = self.fit_mappings
 
     def get_dsets(self):
@@ -207,7 +210,7 @@ class PKDataSimulationExperiment(DexSimulationExperiment):
             if key.endswith("_unit"):
                 # parse the item and unit in dict
                 units = dset[key]
-                item_key = key[0:-5]            # remove "_unit"
+                item_key = key[0:-5]  # remove "_unit"
                 if item_key not in dset.keys():
                     logger.error(
                         f"Missing * column '{item_key}' for unit " f"column: '{key}'"
@@ -382,7 +385,7 @@ class PKDataSimulationExperiment(DexSimulationExperiment):
 
             tcsims[id] = TimecourseSim(timecourses=Timecourse(**task_dict))
             for key, dset in self.dsets.items():
-                if(dset["interventions"][0]==str(intervention)):
+                if (dset["interventions"][0] == str(intervention)):
                     dset["task"] = id
         return tcsims
 
@@ -396,7 +399,7 @@ class PKDataSimulationExperiment(DexSimulationExperiment):
             # TODO: encapsulate -> utils
             meta_data_dict = {
                 "diplotype": None,
-                "tissue":  None,
+                "tissue": None,
                 "diplotypic_phenotype": None,
                 "metabolic_phenotype": None,
                 "quinidine": False,
@@ -438,6 +441,49 @@ class PKDataSimulationExperiment(DexSimulationExperiment):
             )
         return mappings
 
+    def set_figures(self) -> Dict[str, Figure]:
+
+        fig = Figure(experiment=self, sid=self.sid, name=f"{self.sid}", num_rows=4)
+        plots = fig.create_plots(xaxis=Axis("time", unit=self.unit_time), legend=True)
+
+        # simulation data
+        for task in self.simulation_tasks:
+            for substance_index, substance in enumerate(["dex", "dor"]):
+                for tissue_index, tissue in enumerate([f"[Cve_{substance}]", f"Aurine_{substance}"]):
+                    index = substance_index * 2 + tissue_index
+                    plots[index].add_data(task=task, xid="time", yid=tissue,
+                                          label=tissue, color="black")
+
+
+        # experimental data
+        substance_mapping = {
+            "[Cve_dex]": 0,
+            "[Cve_dor]": 1,
+            "Aurine_dex": 2,
+            "Aurine_dor": 3,
+        }
+
+        # TODO: create dset to plot index mapping
+        for key, dset in self.dsets.items():
+            assert len(dset['yid'].unique()) == 1
+
+            # TODO: get from utils
+            if "mean" in dset.columns:
+                subject_type = "mean"
+            else:
+                subject_type = "value"
+
+            if "cyp2d6 phenotype" in dset.columns:
+                color = colors_phenotype[dset['cyp2d6 phenotype']][0]
+            else:
+                color = "tab:grey"
+
+            plots[substance_mapping[dset['yid'][0]]].add_data(dataset=key, xid="time", yid=subject_type,
+                              count="count", label="PM", color=color)
+
+        return {
+            "fig1": fig,
+        }
 
 
 def dataset_name(experiment, splitter: str, split_key: str) -> str:
@@ -468,6 +514,7 @@ def dataset_name(experiment, splitter: str, split_key: str) -> str:
 def convert_units(experiment: DexSimulationExperiment, dset: DataSet):
     Q_ = experiment.Q_
 
+    # TODO: encapsulate -> utils
     if "mean" in dset.columns:
         subject_type = "mean"
     else:
