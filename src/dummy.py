@@ -12,5 +12,4 @@ if __name__ == "__main__":
     print(Capon1996)
     test: PKDataSimulationExperiment = PKDataSimulationExperiment(sid=Capon1996.sid)
     print(test)
-
-    #run_experiments(Capon1996, output_dir="test")
+    run_experiments(test, output_dir="test")
