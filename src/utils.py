@@ -1,6 +1,5 @@
 import ast
 import json
-import logging
 import sys
 from typing import Dict
 
@@ -8,14 +7,12 @@ import coloredlogs
 import numpy as np
 from pint import Quantity
 from pkdb_models.models.dextromethorphan.experiments.base_experiment import DexSimulationExperiment
+
+from sbmlutils import log
 from sbmlsim.data import DataSet
 from sbmlsim.experiment import SimulationExperiment
 
-coloredlogs.install(
-    level="INFO",
-    fmt='%(levelname)s %(pathname)s:%(lineno)d %(message)s'
-)
-logger = logging.getLogger(__name__)
+logger = log.get_logger(__name__)
 
 
 def min_max_time(experiment: SimulationExperiment) -> (float, float):
