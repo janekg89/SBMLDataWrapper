@@ -1,18 +1,96 @@
 import ast
 import json
 import sys
-from typing import Dict
+from typing import Dict, List
 
 import coloredlogs
 import numpy as np
 from pint import Quantity
+
 from pkdb_models.models.dextromethorphan.experiments.base_experiment import DexSimulationExperiment
+
 
 from sbmlutils import log
 from sbmlsim.data import DataSet
 from sbmlsim.experiment import SimulationExperiment
 
+from src.experiment_factory import ExperimentFactory, TimecourseMetaData        # this is circular
+from src.key_mappings import KeyMappings
+
 logger = log.get_logger(__name__)
+
+
+def metadata_to_key(data: TimecourseMetaData, mapping: KeyMappings) -> str:
+    """
+    Creates the yid for each dset.
+    Assumes only one substance and measurement_type per dset.
+    """
+
+    substance = data.substance
+    measurement = data.timecourse.measurement
+
+    # TODO: This is dex specific: generailze.
+    if substance in ["dtf-plus-dtfglu"]:
+        logger.warning(f"Ambiguous substance found: {substance}.")
+
+    if measurement == "concentration":
+        yid = f"[Cve_{mapping.substance_mapping[substance]}]"
+    elif measurement == "cumulative amount":
+        yid = f"Aurine_{mapping.substance_mapping[substance]}"
+    else:
+        raise ValueError(f"Unexpected measurement: {measurement}.")
+
+    return yid
+
+
+def add_interventions(experiment: ExperimentFactory):
+    """
+    Creates dictionary with intevention_pk as key that contains substance dose and unit
+    of all substances in each intervention.
+    :param experiment:
+    :return:
+    """
+    experiment.tcs["interventions"] = ""
+    experiment.ops["interventions"] = ""
+    interventions: Dict[str, List] = {}
+    for intervention_index, intervention_row in experiment.interventions.iterrows():
+        if intervention_row["intervention_pk"] in interventions.keys():
+            # TODO: DataClass instead of dict?
+            interventions[intervention_row["intervention_pk"]].append(
+                {
+                    "substance": intervention_row["substance"],
+                    "dose": intervention_row["value"],
+                    "unit": intervention_row["unit"],
+                    "route": intervention_row["route"],
+                }
+            )
+        else:
+            interventions[intervention_row["intervention_pk"]] = [
+                {
+                    "substance": intervention_row["substance"],
+                    "dose": intervention_row["value"],
+                    "unit": intervention_row["unit"],
+                    "route": intervention_row["route"],
+                }
+            ]
+    # add dictionary entry to each tc/op
+    for index, tc in experiment.tcs.iterrows():
+        experiment.tcs.at[index, "interventions"] = interventions[tc["intervention_pk"]]
+    for index, op in experiment.ops.iterrows():
+        experiment.ops.at[index, "interventions"] = interventions[op["intervention_pk"]]
+
+
+def add_group_data(experiment: ExperimentFactory):
+    """
+        Adds group name and count to each timecourse and each output
+    """
+    for output_type in ["tcs", "ops"]:
+        for index, content in getattr(experiment, output_type).iterrows():
+            for group_index, group_row in experiment.groups.iterrows():
+                if content["group_pk"] == group_row["group_pk"]:
+                    getattr(experiment, output_type).at[index, "count"] = group_row["group_count"]
+                    getattr(experiment, output_type).at[index, "count_unit"] = experiment.Q_(1, "dimensionless").units
+                    getattr(experiment, output_type).at[index, "group_name"] = group_row["group_name"]
 
 
 def min_max_time(experiment: SimulationExperiment) -> (float, float):
@@ -48,10 +126,12 @@ def intervention_details(experiment: SimulationExperiment, medication: Dict[str,
         dose = experiment.f_dexhbr_to_dex()
     return substance, route, dose
 
-def append_task_id(experiment: SimulationExperiment, intervention:str , task_id: str):
+
+def append_task_id(experiment: SimulationExperiment, intervention: str, task_id: str):
     for key, dset in experiment.dsets.items():
         if dset["interventions"][0] == str(intervention):
             dset["task"] = task_id
+
 
 def base_meta_data_dict() -> Dict:
     meta_data_dict = {

@@ -4,21 +4,30 @@ Factory which allows to create SimulationExperiments from PKDB information.
 Necessary to provide the model and necessary changes.
 
 """
+import json
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Any, Optional
+from pkdb_analysis.data import PKData, PKDataFrame
 
 import numpy as np
+from pkdb_analysis.units import ureg
+
+import utils
 from pint import Quantity
 from pydantic import BaseModel
 from sbmlsim.experiment import SimulationExperiment
 from sbmlsim.simulation import TimecourseSim
 from sbmlsim.fit import FitMapping
 
+from dex_mappings import DexKeyMapping
+
 # -------------------------------------------------
 # This can be done generically, from the database
-class Timecourse(BaseModel):
-    _label: str  # never use this for anything
-    substance: str
+
+
+
+class Timecourse:
+    label: str  # never use this for anything
     unit: str
     time: np.ndarray
     value: np.ndarray
@@ -27,22 +36,75 @@ class Timecourse(BaseModel):
     se: np.ndarray
     median: np.ndarray
     count: int
-    # tissue ?
+    
+    def __init__(self, tc, **data: Any):
+        self.label = tc['label']
+        self.count = tc['count']
+        self.count_unit = tc['count_unit']
+        self.measurement = tc['measurement_type']
+        self.time = json.loads(tc['time'])
+        self.time_unit = tc['time_unit']
+        self.mean = tc['mean']
+        self.sd = tc['sd']
+        self.unit = tc['unit']
 
-class Intervention(BaseModel):
-    pass
+
+class Intervention:
+    name: str
+    substance: str
+    dose: float
+    unit: str
+    route: str
+
+    def __init__(self, intervention, **data: Any):
+        self.name = intervention["substance"]
+        self.substance = intervention["substance"]
+        self.dose = intervention["dose"]
+        self.unit = intervention["unit"]
+        self.route = intervention["route"]
+
 
 class Group(BaseModel):
-    pass
+    name: str
+    count: int
+
+    def __init__(self, name, count, **data: Any):
+        super().__init__(**data)
+        self.name = name
+        self.count = count
+
 
 class Individual(BaseModel):
-    pass
+    name: str
+    group: Group
 
-class TimecourseMetaData(BaseModel):
-    group: None
-    individual: None
-    intervention: None
+    def __init__(self, name, group,**data: Any):
+        super().__init__(**data)
+        self.name = name
+        self.group = group
+
+
+class TimecourseMetaData:
+    group: Group
+    individual: Individual
+    interventions: List[Intervention]
+    tissue: str
+    substance: str
     timecourse: Timecourse
+
+    def __init__(self, tc):
+        if "group_name" in tc.keys():
+            self.group = tc["group_name"]
+        if "id_name" in tc.keys():
+            self.individual = tc["id_name"]
+        self.interventions = []
+        for intervention in tc["interventions"]:
+            self.interventions.append(Intervention(intervention))
+        self.timecourse = Timecourse(tc)
+        self.tissue = tc['tissue']
+        self.substance = tc['substance']
+
+        # self.phenotype = tc['cyp2d6 phenotype']
 
 # -------------------------------------------------
 # Here manual information is required;
@@ -50,20 +112,36 @@ class TimecourseMetaData(BaseModel):
 # What parameters/conditions should be changed for what groups?
 # Model specific MetaData for filtering/analysis (EM/PM), ...
 
-class ModelDefinition(BaseModel):
+
+class ModelDefinition:
     path: Path
     changes: Dict[str, Quantity]
 
-class Observable(BaseModel):
+    def __init__(self, path, changes):
+        self.path = path
+        self.changes = changes
+
+
+class Observable:
     key: str  # e.g. [Cve_ome]
     model: ModelDefinition
     unit: str
 
+    def __init__(self, key, unit, model=None):
+        self.key = key
+        self.model = model
+        self.unit = unit
 
-class Mapping(BaseModel):
-    # key: str  # [ome_urine_em]
+
+class Mapping:
+    key: str  # [ome_urine_em]
     data: TimecourseMetaData
     observable: Observable
+
+    def __init__(self, tc: Timecourse):
+        self.data = TimecourseMetaData(tc)
+        self.key = utils.metadata_to_key(self.data, DexKeyMapping())
+        self.observable = Observable(self.key, self.data.timecourse.unit)
 
     def create_timecourse_simulation(self) -> TimecourseSim:
         """Based on Dosing"""
@@ -74,6 +152,17 @@ class Mapping(BaseModel):
         mapping = None
         return mapping
 
+    def __repr__(self):
+        return self.__str__()
+
+    def __str__(self):
+        """Get string representation."""
+        info = [
+            f"{'Timecourse':20} {self.data.timecourse.label}",
+            f"{'Key':20} {self.key}",
+        ]
+        return "\n".join(info)
+
 
 class ExperimentFactoryOptions:
     pkdb_id: str
@@ -81,10 +170,26 @@ class ExperimentFactoryOptions:
 
 
 class ExperimentFactory:
+    mappings: List[Mapping]
 
-    def __init__(self, ...):
+    def __init__(self, sid: str, zip_path, **kwargs):
+        self.sid = sid
+        self.zip_path = zip_path
+        self.Q_ = ureg.Quantity
+        self.pkdata_raw: PKData = PKData.from_archive(zip_path).filter({"outputs": {"study_name": self.sid}})
 
-        self.mappings: List[Mapping] = None
+        # not sure if ok here
+        self.tcs: PKDataFrame = self.pkdata_raw.timecourses
+        self.ops: PKDataFrame = self.pkdata_raw.outputs
+        self.groups: PKDataFrame = self.pkdata_raw.groups
+        self.interventions: PKDataFrame = self.pkdata_raw.interventions
+        utils.add_group_data(self)
+        utils.add_interventions(self)
+
+        self.mappings: List[Mapping] = []
+
+        for index, tc in self.tcs.iterrows():
+            self.mappings.append(Mapping(tc))
 
     def create_experiment(self) -> SimulationExperiment:
         """Uses the instance information to create a simulation experiment."""
@@ -93,6 +198,21 @@ class ExperimentFactory:
         experiment = None
 
         return experiment
+
+    def __repr__(self):
+        return "ExperimentFactory()"
+
+    def __str__(self):
+        """Get string representation."""
+        info = ["-" * 80, f"SimulationExperiment: {self.__class__.__name__}: {self.sid}",
+                "-" * 80,
+                f"{'Timecourses':20} \n {self.tcs}",
+                f"{'Outputs':20} \n {self.ops}",
+                f"{'Mappings':20}",
+                str(*self.mappings),
+                "-" * 80,
+                ]
+        return "\n".join(info)
 
 
 # Capon1996
