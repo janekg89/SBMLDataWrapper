@@ -14,7 +14,7 @@ from sbmlutils import log
 from sbmlsim.data import DataSet
 from sbmlsim.experiment import SimulationExperiment
 
-from src.experiment_factory import ExperimentFactory, TimecourseMetaData        # this is circular
+from src.experiment_factory import ExperimentFactory, TimecourseMetaData, Timecourse  # this is circular
 from src.key_mappings import KeyMappings
 
 logger = log.get_logger(__name__)
@@ -93,11 +93,32 @@ def add_group_data(experiment: ExperimentFactory):
                     getattr(experiment, output_type).at[index, "group_name"] = group_row["group_name"]
 
 
+# deprecated
 def min_max_time(experiment: SimulationExperiment) -> (float, float):
     """
         Return the minimum and maximum time point of all time-courses.
     """
     time = experiment.tcs['time'].values.copy()
+    time = list(map(ast.literal_eval, time))
+    time_array = np.array([np.array(xi) for xi in time], dtype=object)
+    min_time = sys.float_info.max
+    max_time = sys.float_info.min
+    for element in time_array:
+        if min_time > min(element):
+            min_time = min(element)
+        if max_time < max(element):
+            max_time = max(element)
+    if min_time > 0:
+        min_time = 0.0
+    return min_time, max_time
+
+
+def min_max_time_tc(tc: Timecourse) -> (float, float):
+    """
+        Return the minimum and maximum time point of all time-courses.
+    """
+    print(tc.time)
+    time = tc['time'].values.copy()
     time = list(map(ast.literal_eval, time))
     time_array = np.array([np.array(xi) for xi in time], dtype=object)
     min_time = sys.float_info.max

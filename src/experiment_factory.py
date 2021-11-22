@@ -11,20 +11,19 @@ from pkdb_analysis.data import PKData, PKDataFrame
 
 import numpy as np
 from pkdb_analysis.units import ureg
+from sbmlutils.factory import Q_
 
 import utils
 from pint import Quantity
 from pydantic import BaseModel
 from sbmlsim.experiment import SimulationExperiment
 from sbmlsim.simulation import TimecourseSim
-from sbmlsim.fit import FitMapping
+from sbmlsim.fit import FitMapping, FitData
+from sbmlsim.simulation import Timecourse as Timecourse_sbmlsim
 
 from dex_mappings import DexKeyMapping
 
-# -------------------------------------------------
-# This can be done generically, from the database
-
-
+STEPS_PER_SEC = 1.0
 
 class Timecourse:
     label: str  # never use this for anything
@@ -62,6 +61,13 @@ class Intervention:
         self.dose = intervention["dose"]
         self.unit = intervention["unit"]
         self.route = intervention["route"]
+
+    def __repr__(self):
+        return self.__str__()
+
+    def __str__(self):
+        """Get string representation."""
+        return f"{self.substance}_{self.dose}{self.unit}_{self.route}"
 
 
 class Group(BaseModel):
@@ -132,23 +138,39 @@ class Observable:
         self.model = model
         self.unit = unit
 
-
 class Mapping:
     key: str  # [ome_urine_em]
     data: TimecourseMetaData
     observable: Observable
+    tcsim: TimecourseSim
+    mapping: FitMapping
 
     def __init__(self, tc: Timecourse):
         self.data = TimecourseMetaData(tc)
         self.key = utils.metadata_to_key(self.data, DexKeyMapping())
         self.observable = Observable(self.key, self.data.timecourse.unit)
+        self.tcsim = self.create_timecourse_simulation()
 
     def create_timecourse_simulation(self) -> TimecourseSim:
         """Based on Dosing"""
         tcsim = None
+        for intervention in self.data.interventions:
+            # FIXME: how to handle multiple interventions?
+            DOSE = Q_(intervention.dose, intervention.unit)
+            t_end = self.data.timecourse.time[-1]
+            steps = int(t_end * 3600 * STEPS_PER_SEC)
+            tcsim = TimecourseSim(timecourses=Timecourse_sbmlsim(
+                    start=0, end=t_end, steps=steps,
+                    changes={
+                        **self.default_changes(),
+                        f"{intervention.route}DOSE_{intervention.substance}": DOSE,
+                    }
+                )
+            )
         return tcsim
 
     def create_fit_mapping(self) -> FitMapping:
+        # TODO: FitMapping requiers name of task and name of data set. This should be changed.
         mapping = None
         return mapping
 
@@ -162,6 +184,9 @@ class Mapping:
             f"{'Key':20} {self.key}",
         ]
         return "\n".join(info)
+
+    def default_changes(self):
+        return {}
 
 
 class ExperimentFactoryOptions:
@@ -209,10 +234,10 @@ class ExperimentFactory:
                 f"{'Timecourses':20} \n {self.tcs}",
                 f"{'Outputs':20} \n {self.ops}",
                 f"{'Mappings':20}",
-                str(*self.mappings),
-                "-" * 80,
                 ]
+        for mapping in self.mappings:
+            info.append(f"{mapping} \n")
+        info.append("-" * 80,)
         return "\n".join(info)
 
 
-# Capon1996
