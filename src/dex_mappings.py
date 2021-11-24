@@ -26,6 +26,10 @@ class DexKeyMapping(KeyMappings):
         "qui-s": "qui",
     }
 
+    route_mapping = {
+        "oral": "PO"
+    }
+
     key_mapping = {
 
         # substances

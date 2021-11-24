@@ -6,6 +6,10 @@ class KeyMappings:
 
     task_mapping = {}
 
+    route_mapping = {
+        "oral": "PO"
+    }
+
     key_mapping = {
         # measurement
         "concentration": "concentration",
