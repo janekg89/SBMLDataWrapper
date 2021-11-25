@@ -12,16 +12,16 @@ from tests import TEST_PKDATA, TEST_MODEL_BASE_PATH
 
 
 class TestCustomSimulationExperiment(TestCase):
-    """ Test automatic merging of data with simulation Experiment"""
+    """Test automatic merging of data with simulation Experiment"""
 
     def setUp(self) -> None:
         c = CustomSimulationExperiment(TEST_PKDATA, base_path=TEST_MODEL_BASE_PATH)
         c.__class__.__name__ = "Nyunt2008"
         self.nyunt2008 = c
 
-
         class CustomSimulationExperiment2(CustomSimulationExperiment):
             pass
+
         c2 = CustomSimulationExperiment2(TEST_PKDATA, base_path=TEST_MODEL_BASE_PATH)
         c2.__class__.__name__ = "Unknown"
         self.unknown = c2
@@ -41,10 +41,3 @@ class TestCustomSimulationExperiment(TestCase):
     def test_datasets_pkdata(self):
         c = self.nyunt2008
         c.datasets_pkdata()
-
-
-
-
-
-
-

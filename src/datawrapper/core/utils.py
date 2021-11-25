@@ -7,14 +7,20 @@ import coloredlogs
 import numpy as np
 from pint import Quantity
 
-from pkdb_models.models.dextromethorphan.experiments.base_experiment import DexSimulationExperiment
+from pkdb_models.models.dextromethorphan.experiments.base_experiment import (
+    DexSimulationExperiment,
+)
 
 
 from sbmlutils import log
 from sbmlsim.data import DataSet
 from sbmlsim.experiment import SimulationExperiment
 
-from src.experiment_factory import ExperimentFactory, TimecourseMetaData, Timecourse  # this is circular
+from src.experiment_factory import (
+    ExperimentFactory,
+    TimecourseMetaData,
+    Timecourse,
+)  # this is circular
 from src.key_mappings import KeyMappings
 
 logger = log.get_logger(__name__)
@@ -82,23 +88,29 @@ def add_interventions(experiment: ExperimentFactory):
 
 def add_group_data(experiment: ExperimentFactory):
     """
-        Adds group name and count to each timecourse and each output
+    Adds group name and count to each timecourse and each output
     """
     for output_type in ["tcs", "ops"]:
         for index, content in getattr(experiment, output_type).iterrows():
             for group_index, group_row in experiment.groups.iterrows():
                 if content["group_pk"] == group_row["group_pk"]:
-                    getattr(experiment, output_type).at[index, "count"] = group_row["group_count"]
-                    getattr(experiment, output_type).at[index, "count_unit"] = experiment.Q_(1, "dimensionless").units
-                    getattr(experiment, output_type).at[index, "group_name"] = group_row["group_name"]
+                    getattr(experiment, output_type).at[index, "count"] = group_row[
+                        "group_count"
+                    ]
+                    getattr(experiment, output_type).at[
+                        index, "count_unit"
+                    ] = experiment.Q_(1, "dimensionless").units
+                    getattr(experiment, output_type).at[
+                        index, "group_name"
+                    ] = group_row["group_name"]
 
 
 # deprecated
 def min_max_time(experiment: SimulationExperiment) -> (float, float):
     """
-        Return the minimum and maximum time point of all time-courses.
+    Return the minimum and maximum time point of all time-courses.
     """
-    time = experiment.tcs['time'].values.copy()
+    time = experiment.tcs["time"].values.copy()
     time = list(map(ast.literal_eval, time))
     time_array = np.array([np.array(xi) for xi in time], dtype=object)
     min_time = sys.float_info.max
@@ -115,10 +127,10 @@ def min_max_time(experiment: SimulationExperiment) -> (float, float):
 
 def min_max_time_tc(tc: Timecourse) -> (float, float):
     """
-        Return the minimum and maximum time point of all time-courses.
+    Return the minimum and maximum time point of all time-courses.
     """
     print(tc.time)
-    time = tc['time'].values.copy()
+    time = tc["time"].values.copy()
     time = list(map(ast.literal_eval, time))
     time_array = np.array([np.array(xi) for xi in time], dtype=object)
     min_time = sys.float_info.max
@@ -133,11 +145,13 @@ def min_max_time_tc(tc: Timecourse) -> (float, float):
     return min_time, max_time
 
 
-def intervention_details(experiment: SimulationExperiment, medication: Dict[str, str]) -> (str, str, str):
+def intervention_details(
+    experiment: SimulationExperiment, medication: Dict[str, str]
+) -> (str, str, str):
     substance = medication["substance"]
-    if medication['route'] == "oral":
+    if medication["route"] == "oral":
         route = "PO"
-    elif medication['route'] == "iv":
+    elif medication["route"] == "iv":
         route = "IV"
     else:
         raise ValueError("Unexpected route in interventions.")
@@ -173,7 +187,7 @@ def fill_meta_dict(dset) -> Dict:
         if meta_data_entry in dset.columns:
             assert len(dset[meta_data_entry].unique()) == 1
             meta_data_dict[meta_data_entry] = dset[meta_data_entry][0]
-    for intervention in dset['interventions'].unique():
+    for intervention in dset["interventions"].unique():
         if "qui" in intervention:
             meta_data_dict["quinidine"] = True
         # FIXME: for now inhibition is always false
@@ -213,7 +227,10 @@ def convert_units(experiment: DexSimulationExperiment, dset: DataSet):
     for key, intervention_dict in doses.items():
         if intervention_dict["substance"] == "dextromethorphan hydrobromide":
             # FIXME: why is multiplication of quantity by quantity not possible in this context?
-            dose = float(float(intervention_dict["dose"].magnitude) * experiment.f_dexhbr_to_dex())  # DEX-HBr
+            dose = float(
+                float(intervention_dict["dose"].magnitude)
+                * experiment.f_dexhbr_to_dex()
+            )  # DEX-HBr
             DOSE = Q_(dose, intervention_dict["dose"].units)
             continue
         elif intervention_dict["substance"] == "dextromethorphan":
@@ -223,19 +240,31 @@ def convert_units(experiment: DexSimulationExperiment, dset: DataSet):
 
     # % -> mMol
     if measurement == "recovery":
-        if not Q_(dset.uinfo[subject_type]).dimensionality == Q_(1, "mole").dimensionality:
+        if (
+            not Q_(dset.uinfo[subject_type]).dimensionality
+            == Q_(1, "mole").dimensionality
+        ):
             if substance == "dextromethorphan":
-                dset.unit_conversion(subject_type, DOSE / experiment.Mr.dex / Q_(100, "percent"))
+                dset.unit_conversion(
+                    subject_type, DOSE / experiment.Mr.dex / Q_(100, "percent")
+                )
             elif substance == "dextrorphan":
-                dset.unit_conversion(subject_type, DOSE / experiment.Mr.dor / Q_(100, "percent"))
+                dset.unit_conversion(
+                    subject_type, DOSE / experiment.Mr.dor / Q_(100, "percent")
+                )
             elif substance == "dextrorphan-glucuronide":
-                dset.unit_conversion(subject_type, DOSE / experiment.Mr.dorglu / Q_(100, "percent"))
+                dset.unit_conversion(
+                    subject_type, DOSE / experiment.Mr.dorglu / Q_(100, "percent")
+                )
             else:
                 logger.warning(f"skipped {substance} in {dset.index}")
 
     # mg/mL -> mMol/mL
     if measurement == "concentration":
-        if not Q_(dset.uinfo[subject_type]).dimensionality == Q_(1, "mole/l").dimensionality:
+        if (
+            not Q_(dset.uinfo[subject_type]).dimensionality
+            == Q_(1, "mole/l").dimensionality
+        ):
             if substance == "dextromethorphan":
                 dset.unit_conversion(subject_type, 1 / experiment.Mr.dex)
             elif substance == "dextrorphan":
@@ -246,7 +275,9 @@ def convert_units(experiment: DexSimulationExperiment, dset: DataSet):
                 logger.warning(f"skipped {substance} in {dset.index}")
 
 
-def dose_from_json(experiment: DexSimulationExperiment, interventions) -> Dict[str, Quantity]:
+def dose_from_json(
+    experiment: DexSimulationExperiment, interventions
+) -> Dict[str, Quantity]:
     Q_ = experiment.Q_
     doses = {}
     with open(f"{experiment.data_path[0]}/{experiment.sid}/study.json") as f:
@@ -260,7 +291,9 @@ def dose_from_json(experiment: DexSimulationExperiment, interventions) -> Dict[s
     return doses
 
 
-def interventions_from_json(experiment: DexSimulationExperiment, interventions) -> Dict[str, Dict[str, Quantity]]:
+def interventions_from_json(
+    experiment: DexSimulationExperiment, interventions
+) -> Dict[str, Dict[str, Quantity]]:
     Q_ = experiment.Q_
     interventions_dict = {}
     with open(f"{experiment.data_path[0]}/{experiment.sid}/study.json") as f:
@@ -270,6 +303,6 @@ def interventions_from_json(experiment: DexSimulationExperiment, interventions) 
         if element["name"] in interventions:
             interventions_dict[element["name"]] = {
                 "substance": element["substance"],
-                "dose": Q_(element["value"], element["unit"])
+                "dose": Q_(element["value"], element["unit"]),
             }
     return interventions_dict

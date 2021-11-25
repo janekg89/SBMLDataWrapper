@@ -6,26 +6,25 @@ Necessary to provide the model and necessary changes.
 """
 import json
 from pathlib import Path
-from typing import List, Dict, Any, Optional
-from pkdb_analysis.data import PKData, PKDataFrame
-
-import numpy as np
-from pkdb_analysis.units import ureg
-from sbmlutils.factory import Q_
-
-import utils
+from typing import List, Dict, Any
 from pint import Quantity
 from pydantic import BaseModel
+
+import numpy as np
+
+from sbmlutils.factory import Q_
+
+from pkdb_analysis.units import ureg
+from pkdb_analysis.data import PKData, PKDataFrame
+
+import utils
+
 from sbmlsim.experiment import SimulationExperiment
 from sbmlsim.simulation import TimecourseSim
 from sbmlsim.fit import FitMapping, FitData
 from sbmlsim.simulation import Timecourse as Timecourse_sbmlsim
 
-from key_mappings import KeyMappings
-
-from dex_mappings import DexKeyMapping
-
-STEPS_PER_SEC = 1.0
+# from key_mappings import KeyMappings
 
 
 class Timecourse:
@@ -40,15 +39,15 @@ class Timecourse:
     count: int
 
     def __init__(self, tc):
-        self.label = tc['label']
-        self.count = tc['count']
-        self.count_unit = tc['count_unit']
-        self.measurement = tc['measurement_type']
-        self.time = json.loads(tc['time'])
-        self.time_unit = tc['time_unit']
-        self.mean = tc['mean']
-        self.sd = tc['sd']
-        self.unit = tc['unit']
+        self.label = tc["label"]
+        self.count = tc["count"]
+        self.count_unit = tc["count_unit"]
+        self.measurement = tc["measurement_type"]
+        self.time = json.loads(tc["time"])
+        self.time_unit = tc["time_unit"]
+        self.mean = tc["mean"]
+        self.sd = tc["sd"]
+        self.unit = tc["unit"]
 
 
 class Intervention:
@@ -124,19 +123,28 @@ class Task:
     interventions: List[Intervention]
     tcsim: TimecourseSim
 
-    def __init__(self, intervention_set: List[Intervention], t_0=0, t_end=24, key_mapping=KeyMappings, steps_per_min=1):
-        self.interventions=intervention_set
+    def __init__(
+        self,
+        intervention_set: List[Intervention],
+        t_0=0,
+        t_end=24,
+        key_mapping=KeyMappings,
+        steps_per_min=1,
+    ):
+        self.interventions = intervention_set
         changes = self.default_changes()
         for intervention in intervention_set:
             # TODO: add dmthbr -> dmt conversion somewhere
             DOSE = Q_(intervention.dose, intervention.unit)
-            changes[f"{key_mapping.route_mapping[intervention.route]}DOSE_{key_mapping.task_mapping[intervention.substance]}"] = DOSE
+            changes[
+                f"{key_mapping.route_mapping[intervention.route]}DOSE_{key_mapping.task_mapping[intervention.substance]}"
+            ] = DOSE
 
         steps = int(t_end * 3600 * steps_per_min)
-        self.tcsim = TimecourseSim(timecourses=Timecourse_sbmlsim(
-            start=t_0, end=t_end, steps=steps,
-            changes=changes
-        )
+        self.tcsim = TimecourseSim(
+            timecourses=Timecourse_sbmlsim(
+                start=t_0, end=t_end, steps=steps, changes=changes
+            )
         )
 
     def default_changes(self):
@@ -170,8 +178,8 @@ class TimecourseMetaData:
         for intervention in tc["interventions"]:
             self.interventions.append(Intervention(intervention))
         self.timecourse = Timecourse(tc)
-        self.tissue = tc['tissue']
-        self.substance = tc['substance']
+        self.tissue = tc["tissue"]
+        self.substance = tc["substance"]
 
         # self.phenotype = tc['cyp2d6 phenotype']
 
@@ -184,7 +192,8 @@ class TimecourseMetaData:
     def __str__(self):
         """Get string representation."""
         info = [
-            "-" * 80, f"TimecourseMetaData:",
+            "-" * 80,
+            f"TimecourseMetaData:",
             "-" * 80,
             f"{'Group':20} {self.group}",
             f"{'Individual':20} {self.individual}",
@@ -192,7 +201,6 @@ class TimecourseMetaData:
             f"{'Tissue':20} {self.tissue}",
             f"{'Substance':20} {self.substance}",
             f"{'Task':20} {self.task}",
-
         ]
         return "\n".join(info)
 
@@ -240,7 +248,9 @@ class Mapping:
     def __init__(self, data: TimecourseMetaData, mapping=KeyMappings()):
         self.data = data
         self.task = data.task
-        self.observable = Observable(utils.metadata_to_key(data, mapping), data.timecourse.unit)
+        self.observable = Observable(
+            utils.metadata_to_key(data, mapping), data.timecourse.unit
+        )
         # self.mapping = FitMapping() TODO for Matthias
 
     def __repr__(self):
@@ -249,7 +259,8 @@ class Mapping:
     def __str__(self):
         """Get string representation."""
         info = [
-            "-" * 80, f"Mapping:",
+            "-" * 80,
+            f"Mapping:",
             "-" * 80,
             f"{'Data':20} \n{self.data} \n",
             f"{'Observable':20} {self.observable}",
@@ -267,17 +278,20 @@ class ExperimentFactory:
     tasks: List[Task]
     mappings: List[Mapping]
 
-    def __init__(self, sid: str, zip_path, **kwargs):
+    def __init__(self, sid: str, zip_path, key_mapping, **kwargs):
         self.sid = sid
         self.zip_path = zip_path
         self.Q_ = ureg.Quantity
-        self.pkdata_raw: PKData = PKData.from_archive(zip_path).filter({"outputs": {"study_name": self.sid}})
+        self.pkdata_raw: PKData = PKData.from_archive(zip_path).filter(
+            {"outputs": {"study_name": self.sid}}
+        )
 
         # not sure if ok here
         self.tcs: PKDataFrame = self.pkdata_raw.timecourses
         self.ops: PKDataFrame = self.pkdata_raw.outputs
         self.groups: PKDataFrame = self.pkdata_raw.groups
         self.interventions: PKDataFrame = self.pkdata_raw.interventions
+        self.key_mapping = key_mapping
         utils.add_group_data(self)
         utils.add_interventions(self)
 
@@ -296,15 +310,14 @@ class ExperimentFactory:
             if dset.interventions not in unique_interventions:
                 unique_interventions.append(dset.interventions)
                 # creates a task fore each unique intervention
-                self.tasks.append(Task(dset.interventions, key_mapping=DexKeyMapping))
+                self.tasks.append(Task(dset.interventions, key_mapping=key_mapping))
             for task in self.tasks:
                 if task.interventions == dset.interventions:
                     # assigns a task to each timecourse (and later also output)
                     dset.set_task(task)
                     break
             # initialise Mapping objects
-            self.mappings.append(Mapping(dset, mapping=DexKeyMapping()))
-
+            self.mappings.append(Mapping(dset, mapping=key_mapping))
 
     def create_experiment(self) -> SimulationExperiment:
         """Uses the instance information to create a simulation experiment."""
@@ -319,13 +332,17 @@ class ExperimentFactory:
 
     def __str__(self):
         """Get string representation."""
-        info = ["-" * 80, f"SimulationExperiment: {self.__class__.__name__}: {self.sid}",
-                "-" * 80,
-                f"{'Timecourses':20} \n {self.tcs}",
-                f"{'Outputs':20} \n {self.ops}",
-                f"{'Mappings':20}",
-                ]
+        info = [
+            "-" * 80,
+            f"SimulationExperiment: {self.__class__.__name__}: {self.sid}",
+            "-" * 80,
+            f"{'Timecourses':20} \n {self.tcs}",
+            f"{'Outputs':20} \n {self.ops}",
+            f"{'Mappings':20}",
+        ]
         for mapping in self.mappings:
             info.append(f"{mapping} \n")
-        info.append("-" * 80, )
+        info.append(
+            "-" * 80,
+        )
         return "\n".join(info)
