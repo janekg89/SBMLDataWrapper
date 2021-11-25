@@ -1,6 +1,9 @@
 # SBMLDataWrapper
-A repository for automatic initialization of simulation experiments from DataFrames and PKDB.  
+A repository for automatic initialization of simulation experiments PKDB data.  
 
 
 ## Install
-Install the `develop` branch of `pkdb_analysis` and `sedml` branch of `sbmlsim`.
+Install the 
+* `develop` branch of `pkdb_analysis`
+* `sedml` branch of `sbmlsim`.
+
