@@ -4,6 +4,7 @@ Factory which allows to create SimulationExperiments from PKDB information.
 Necessary to provide the model and necessary changes.
 
 """
+from __future__ import annotations
 import json
 from pathlib import Path
 from typing import List, Dict, Any
@@ -13,38 +14,50 @@ from pydantic import BaseModel
 import numpy as np
 
 from pint import Quantity
-
-from pkdb_analysis.data import PKData, PKDataFrame
-
-from sbmlsim.experiment import SimulationExperiment
 from sbmlsim.simulation import TimecourseSim
 from sbmlsim.fit import FitMapping
 from sbmlsim.simulation import Timecourse as Timecourse_sbmlsim
 
-from datawrapper.core.key_mappings import KeyMappings
-
 
 class Timecourse:
-    label: str  # never use this for anything
-    unit: str
-    time: np.ndarray
-    value: np.ndarray
-    mean: np.ndarray
-    sd: np.ndarray
-    se: np.ndarray
-    median: np.ndarray
-    count: int
+    _keys: List[str] = [
+        "label",
+        "measurement_type",
+        "tissue",
+        "substance",
+        "time",
+        "time_unit",
+        "mean",
+        "sd",
+        "se",
+        "median",
+        "cv",
+        "unit",
+    ]
 
     def __init__(self, tc):
-        self.label = tc["label"]
-        self.count = tc["count"]
-        self.count_unit = tc["count_unit"]
-        self.measurement = tc["measurement_type"]
-        self.time = json.loads(tc["time"])
+        self.label: str = tc["label"]
+
+        self.measurement_type: str = tc["measurement_type"]
+        self.tissue = tc["tissue"]
+        self.substance = tc["substance"]
+
+        self.time = tc["time"]
         self.time_unit = tc["time_unit"]
         self.mean = tc["mean"]
         self.sd = tc["sd"]
+        self.se = tc["se"]
+        self.median = tc["median"]
+        self.cv = tc["cv"]
         self.unit = tc["unit"]
+
+    def __str__(self):
+        info = [
+            self.__class__.__name__,
+        ]
+        for key in self._keys:
+            info.append(f"{key:20}{getattr(self, key)}")
+        return "\n".join(info)
 
     def t0(self) -> float:
         """Get initial time."""
@@ -163,29 +176,18 @@ class TimecourseMetaData:
     tissue: str
     substance: str
     timecourse: Timecourse
-    task: Task
 
-    def __init__(self, tc):
-        self.group = None
-        self.individual = None
-        if "group_name" in tc.keys():
-            self.group = tc["group_name"]
-        if "id_name" in tc.keys():
-            self.individual = tc["id_name"]
-        self.interventions = []
-        for intervention in tc["interventions"]:
-            self.interventions.append(Intervention(intervention))
-        self.timecourse = Timecourse(tc)
-        self.tissue = tc["tissue"]
-        self.substance = tc["substance"]
-
-        # self.phenotype = tc['cyp2d6 phenotype']
-
-    def set_task(self, task: Task):
-        self.task = task
-
-    def __repr__(self):
-        return self.__str__()
+    def __init__(
+        self,
+        timecourse: Timecourse,
+        group: Group,
+        individual: Individual,
+        interventions: List[Intervention],
+    ):
+        self.group = group
+        self.individual = individual
+        self.interventions = interventions
+        self.timecourse = timecourse
 
     def __str__(self):
         """Get string representation."""

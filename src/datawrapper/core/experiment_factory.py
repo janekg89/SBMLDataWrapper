@@ -4,15 +4,14 @@ Factory which allows to create SimulationExperiments from PKDB information.
 Necessary to provide the model and necessary changes.
 
 """
-import json
 from pathlib import Path
-from typing import List, Dict, Any
-
+from typing import List, Dict
+from rich import print
 from pint import Quantity
 
 from pkdb_analysis.data import PKData, PKDataFrame
 
-
+from sbmlutils import log
 from sbmlsim.experiment import SimulationExperiment
 from datawrapper.core.objects import (
     Timecourse,
@@ -20,7 +19,12 @@ from datawrapper.core.objects import (
     Task,
     Mapping,
     Intervention,
+    Individual,
+    Group,
 )
+
+logger = log.get_logger(__name__)
+
 
 class ExperimentFactory:
     data: List[TimecourseMetaData]
@@ -32,7 +36,6 @@ class ExperimentFactory:
         self.pkdata: PKData = PKData.from_archive(zip_path).filter(
             {"outputs": {"study_name": self.sid}}
         )
-
         # not sure if ok here
 
         self.key_mapping = key_mapping
@@ -41,20 +44,43 @@ class ExperimentFactory:
         self.tasks: List[Task] = []
         self.mappings: List[Mapping] = []
 
+        self.create_data()
+        self.create_tasks()
+        self.create_mappings()
+
         # self.initialize()
 
+    def create_data(self):
+        """Creates the data objects."""
+        for index, pkdb_tc in self.pkdata.timecourses.iterrows():
+            timecourse = Timecourse(pkdb_tc)
+            logger.info(timecourse)
+
+            # FIXME: use pkdb_data to read this
+            individual: Individual = None
+            group: Group = None
+            interventions: List[Intervention] = []
+
+            tc_metadata = TimecourseMetaData(
+                timecourse=timecourse,
+                individual=individual,
+                group=group,
+                interventions=interventions,
+            )
+
+            self.data.append(tc_metadata)
+
+    def create_tasks(self):
+        """Creates the task objects."""
+        pass
+
+    def create_mappings(self):
+        """Creates the mapping objects."""
+        pass
+
     def initialize(self):
-        self.tcs: PKDataFrame = self.pkdata.timecourses
-        self.ops: PKDataFrame = self.pkdata.outputs
-        self.groups: PKDataFrame = self.pkdata.groups
-        self.interventions: PKDataFrame = self.pkdata.interventions
-
-        self.add_group_data(self)
-        self.add_interventions(self)
-
-        for index, tc in self.tcs.iterrows():
-            self.data.append(TimecourseMetaData(tc))
-
+        """"""
+        # FIXME: this is create_tasks and mappings
         # goes through all tcs (and later also outputs such as recovery)
         unique_interventions: List[List[Intervention]] = []
         for dset in self.data:
@@ -62,7 +88,9 @@ class ExperimentFactory:
             if dset.interventions not in unique_interventions:
                 unique_interventions.append(dset.interventions)
                 # creates a task fore each unique intervention
-                self.tasks.append(Task(dset.interventions, key_mapping=self.key_mapping))
+                self.tasks.append(
+                    Task(dset.interventions, key_mapping=self.key_mapping)
+                )
             for task in self.tasks:
                 if task.interventions == dset.interventions:
                     # assigns a task to each timecourse (and later also output)
@@ -71,60 +99,41 @@ class ExperimentFactory:
             # initialise Mapping objects
             self.mappings.append(Mapping(dset, mapping=self.key_mapping))
 
-
-    def add_group_data(self):
-        """Adds group name and count to each timecourse and each output."""
-        for output_type in ["tcs", "ops"]:
-            for index, content in getattr(self, output_type).iterrows():
-                for group_index, group_row in self.groups.iterrows():
-                    if content["group_pk"] == group_row["group_pk"]:
-                        getattr(self, output_type).at[index, "count"] = group_row[
-                            "group_count"
-                        ]
-                        getattr(self, output_type).at[
-                            index, "count_unit"
-                        ] = Quantity(1, "dimensionless").units
-                        getattr(self, output_type).at[
-                            index, "group_name"
-                        ] = group_row["group_name"]
-
-    def add_interventions(self):
-        """
-        Creates dictionary with intevention_pk as key that contains substance dose and unit
-        of all substances in each intervention.
-        :param experiment:
-        :return:
-        """
-        self.tcs["interventions"] = ""
-        self.ops["interventions"] = ""
-        interventions: Dict[str, List] = {}
-        for intervention_index, intervention_row in self.interventions.iterrows():
-            if intervention_row["intervention_pk"] in interventions.keys():
-                # TODO: DataClass instead of dict?
-                interventions[intervention_row["intervention_pk"]].append(
-                    {
-                        "substance": intervention_row["substance"],
-                        "dose": intervention_row["value"],
-                        "unit": intervention_row["unit"],
-                        "route": intervention_row["route"],
-                    }
-                )
-            else:
-                interventions[intervention_row["intervention_pk"]] = [
-                    {
-                        "substance": intervention_row["substance"],
-                        "dose": intervention_row["value"],
-                        "unit": intervention_row["unit"],
-                        "route": intervention_row["route"],
-                    }
-                ]
-        # add dictionary entry to each tc/op
-        for index, tc in self.tcs.iterrows():
-            self.tcs.at[index, "interventions"] = interventions[
-                tc["intervention_pk"]]
-        for index, op in self.ops.iterrows():
-            self.ops.at[index, "interventions"] = interventions[
-                op["intervention_pk"]]
+    # def add_interventions(self):
+    #     """
+    #     Creates dictionary with intevention_pk as key that contains substance dose and unit
+    #     of all substances in each intervention.
+    #     :param experiment:
+    #     :return:
+    #     """
+    #     self.tcs["interventions"] = ""
+    #     self.ops["interventions"] = ""
+    #     interventions: Dict[str, List] = {}
+    #     for intervention_index, intervention_row in self.interventions.iterrows():
+    #         if intervention_row["intervention_pk"] in interventions.keys():
+    #             # TODO: DataClass instead of dict?
+    #             interventions[intervention_row["intervention_pk"]].append(
+    #                 {
+    #                     "substance": intervention_row["substance"],
+    #                     "dose": intervention_row["value"],
+    #                     "unit": intervention_row["unit"],
+    #                     "route": intervention_row["route"],
+    #                 }
+    #             )
+    #         else:
+    #             interventions[intervention_row["intervention_pk"]] = [
+    #                 {
+    #                     "substance": intervention_row["substance"],
+    #                     "dose": intervention_row["value"],
+    #                     "unit": intervention_row["unit"],
+    #                     "route": intervention_row["route"],
+    #                 }
+    #             ]
+    #     # add dictionary entry to each tc/op
+    #     for index, tc in self.tcs.iterrows():
+    #         self.tcs.at[index, "interventions"] = interventions[tc["intervention_pk"]]
+    #     for index, op in self.ops.iterrows():
+    #         self.ops.at[index, "interventions"] = interventions[op["intervention_pk"]]
 
     def create_experiment(self) -> SimulationExperiment:
         """Uses the instance information to create a simulation experiment."""
@@ -149,5 +158,3 @@ class ExperimentFactory:
             "-" * 80,
         )
         return "\n".join(info)
-
-

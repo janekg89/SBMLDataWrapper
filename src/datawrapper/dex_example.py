@@ -1,7 +1,9 @@
 from pathlib import Path
 
+from pkdb_analysis import PKData
+
 from datawrapper.core.experiment_factory import ExperimentFactory
-from datawrapper.core.key_mappings import KeyMappings
+from datawrapper.core.objects import KeyMappings
 
 
 class DexKeyMapping(KeyMappings):
@@ -67,8 +69,11 @@ if __name__ == "__main__":
     PKDATA_ZIP_PATH = Path(
         "/home/mkoenig/git/pkdb_models/pkdb_models/models/dextromethorphan/results/pkdata/pkdb_data.zip"
     )
-
     Capon1996 = ExperimentFactory(
         sid="Capon1996", zip_path=PKDATA_ZIP_PATH, key_mapping=DexKeyMapping
     )
+
+    # TODO: paracetamol example
+    # TODO: outputs/correlation
+
     print(Capon1996)
