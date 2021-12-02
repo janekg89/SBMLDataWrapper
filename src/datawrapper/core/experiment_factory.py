@@ -13,7 +13,7 @@ from pkdb_analysis.data import PKData, PKDataFrame
 
 from sbmlutils import log
 from sbmlsim.experiment import SimulationExperiment
-from datawrapper.core.objects import (
+from src.datawrapper.core.objects import (
     Timecourse,
     TimecourseMetaData,
     Task,

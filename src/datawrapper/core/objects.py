@@ -270,15 +270,9 @@ class Mapping:
 
 class KeyMappings:
     """Experiment specific information."""
-
-    intervention_mapping = {}
-
-    substance_mapping = {}
-
-    task_mapping = {}
-
-    route_mapping = {"oral": "PO"}
-
+    intervention_mapping: Dict[str, str]
+    substance_mapping: Dict[str, str]
+    task_mapping: Dict[str, str]
     key_mapping = {
         # measurement
         "concentration": "concentration",
@@ -291,3 +285,21 @@ class KeyMappings:
         "gram": "g",
         "milligram": "mg",
     }
+    route_mapping: Dict[str, str] = {
+        "oral": "PO"
+    }
+
+    def __init__(self, intervention_mapping, substance_mapping, task_mapping):
+        self.intervention_mapping = intervention_mapping
+        self.substance_mapping = substance_mapping
+        self.task_mapping = task_mapping
+
+    def set_route_mapping(self, route_mapping: Dict[str, str]):
+        """ Overrides default route mappings."""
+        self.route_mapping = route_mapping
+
+    def set_key_mapping(self, key_mapping: Dict[str, str]):
+        """ Overrides default key mappings."""
+        self.key_mapping = key_mapping
+
+
