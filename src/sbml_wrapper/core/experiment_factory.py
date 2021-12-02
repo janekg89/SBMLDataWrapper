@@ -20,7 +20,7 @@ from src.sbml_wrapper.core.objects import (
     Mapping,
     Intervention,
     Individual,
-    Group,
+    Group, Observable,
 )
 
 logger = log.get_logger(__name__)
@@ -31,7 +31,7 @@ class ExperimentFactory:
     #tasks: List[Task]
     #mappings: List[Mapping]
 
-    def __init__(self, sid: str, zip_path: Path, key_mapping):
+    def __init__(self, sid: str, zip_path: Path, key_mapping, observables):
         self.sid = sid
         self.pkdata: PKData = PKData.from_archive(zip_path).filter(
             {"outputs": {"study_name": self.sid}}
@@ -43,6 +43,7 @@ class ExperimentFactory:
 
         self.tasks: List[Task] = []
         self.mappings: List[Mapping] = []
+        self.observables: List[Observable] = observables
 
         self.create_data()
         self.create_tasks()

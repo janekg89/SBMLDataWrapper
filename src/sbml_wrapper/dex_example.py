@@ -3,7 +3,7 @@ from pathlib import Path
 from pkdb_analysis import PKData
 
 from core.experiment_factory import ExperimentFactory
-from core.objects import KeyMappings
+from core.objects import KeyMappings, Observable
 
 intervention_mapping = {
     "dmthbr": "DEXHBr",
@@ -23,9 +23,9 @@ task_mapping = {
     "qui": "qui",
     "qui-s": "qui",
 }
-observables = {
-    "[Cve_dex]"
-}
+observables = [Observable(key="[Cve_dex]", unit="", model=None)]
+
+
 
 key_mapping = {
     # substances
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     #)
 
     lopez2005 = ExperimentFactory(
-        sid="Lopez2005", zip_path=PKDATA_ZIP_PATH, key_mapping=dex_mapping
+        sid="Lopez2005", zip_path=PKDATA_ZIP_PATH, key_mapping=dex_mapping, observables=observables)
     )
     print(lopez2005)
 
