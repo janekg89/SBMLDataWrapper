@@ -6,6 +6,9 @@ Necessary to provide the model and necessary changes.
 """
 from pathlib import Path
 from typing import List, Dict
+
+import numpy as np
+import pandas as pd
 from rich import print
 from pint import Quantity
 
@@ -20,11 +23,22 @@ from src.sbml_wrapper.core.objects import (
     Mapping,
     Intervention,
     Individual,
-    Group, Observable,
+    Group, Observable, Data, MetaData,
 )
 
 logger = log.get_logger(__name__)
 
+
+class ValueType:
+    VALUE = "value"
+    MEAN = "mean"
+    MEDIAN = "median"
+
+
+class ErrType:
+    SD = "sd"
+    SE = "se"
+    CV = "cv"
 
 class ExperimentFactory:
     #data: List[TimecourseMetaData]
@@ -39,20 +53,58 @@ class ExperimentFactory:
         # not sure if ok here
 
         self.key_mapping = key_mapping
-        self.data: List[TimecourseMetaData] = []
+        self.task_intervention_mapping = {}
+
+        self.data: List[Data] = self.create_data()
 
         self.tasks: List[Task] = []
         self.mappings: List[Mapping] = []
         self.observables: List[Observable] = observables
 
-        self.create_data()
+
         self.create_tasks()
         self.create_mappings()
         # self.initialize()
 
-    def create_data(self):
-        data_dict = {"timecourses": self.create_timecourse_data()}
-        return data_dict
+
+    def create_data_single(self, output: pd.Series) -> Data:
+        # data_dict = {"timecourses": self.create_timecourse_data()}
+        #  data_dict
+        meta_kwargs = {}
+        subject_pk = output[["group_pk", "individual_pk"]].idxmax()
+        if subject_pk == "individual_pk":
+            meta_kwargs["individual"] = self.pkdata.individuals[subject_pk] == output[subject_pk]
+
+            value = output.value
+            value_type = ValueType.VALUE
+            err = np.NAN
+            err_type = None
+
+        else:
+            value_type = output[[ValueType.MEAN, ValueType.MEDIAN]].idxmax()
+            value = output[value_type]
+
+            err_type = output[[ErrType.SD, ErrType.SE, ErrType.CV]].idxmax()
+            err = output[err_type]
+
+        #todo: create MetaData
+        meta = MetaData()
+        data = Data(
+            value=value,
+            value_type=value_type,
+            err=err,
+            err_type=err_type,
+            unit=output.unit,
+            meta=meta
+            )
+
+
+    def create_data(self) -> List[Data]:
+        data  = []
+        for index, output in self.pkdata.outputs.iterrows():
+            data_single = self.create_data_single(output)
+            data.append(data_single)
+        return data
 
     def create_timecourse_data(self):
         """Creates the data objects."""
@@ -78,7 +130,17 @@ class ExperimentFactory:
 
     def create_tasks(self) -> List[Task]:
         """Creates the task objects."""
-        raise NotImplementedError
+        tasks = []
+        for (intervention_pk, intervention_set) in self.pkdata.interventions.groupby("intervention_pk"):
+            outputs = self.pkdata.outputs
+            t_end = outputs.time.max()
+            t_min = outputs.time.min()
+
+            task = Task()
+            self.task_interventionset_mapping[intervention_pk] = task.sid
+            tasks.append(task)
+
+        raise return tasks
 
     def create_task(self) -> Task:
         """Creates one task object."""
@@ -91,6 +153,8 @@ class ExperimentFactory:
 
     def create_mappings(self):
         """Creates the mapping objects."""
+        for data_single in self.data:
+            self.create_data()
         task = self.get_task()
 
 

@@ -23,8 +23,13 @@ task_mapping = {
     "qui": "qui",
     "qui-s": "qui",
 }
-observables = [Observable(key="[Cve_dex]", unit="", model=None)]
 
+observables = [
+    Observable(key="[Cve_dex]", unit="mol/l", model=None),
+]
+observables = [
+    Observable(key="[Cve_dex]", unit="mol/l", model=None),
+]
 
 
 key_mapping = {
@@ -77,10 +82,17 @@ if __name__ == "__main__":
     #capon1996 = ExperimentFactory(
     #    sid="Capon1996", zip_path=PKDATA_ZIP_PATH, key_mapping=dex_mapping
     #)
+    pkdata_em = pkdb_data.filter_subject("pheno_type" == "EM")
+    pkdata_pm = pkdb_data.filter_subject("pheno_type" == "PM")
 
-    lopez2005 = ExperimentFactory(
-        sid="Lopez2005", zip_path=PKDATA_ZIP_PATH, key_mapping=dex_mapping, observables=observables)
+    lopez2005_em = ExperimentFactory(
+        sid="Lopez2005_em", zip_path=PKDATA_ZIP_PATH, key_mapping=dex_mapping, observables=observables
     )
+
+    lopez2005_pm = ExperimentFactory(
+        sid="Lopez2005_em", zip_path=PKDATA_ZIP_PATH, key_mapping=dex_mapping, observables=observables
+    )
+
     print(lopez2005)
 
     # TODO: paracetamol example

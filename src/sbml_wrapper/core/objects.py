@@ -212,13 +212,16 @@ class Data:
 
         "value",
         "value_err",
+        "err_type",
         "unit",
         "meta",
     ]
-    def __init__(self, value: float, value_err: float, unit: str, meta: MetaData):
+    def __init__(self, value: float, value_type: str, err: float, err_type: str, unit: str, meta: MetaData):
 
         self.value = value
-        self.value_err = value_err
+        self.value_type = value_type
+        self.err = err
+        self.err_type = err_type
         self.unit = unit
         self.meta = meta
 
