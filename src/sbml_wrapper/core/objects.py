@@ -18,26 +18,108 @@ from sbmlsim.simulation import TimecourseSim
 from sbmlsim.fit import FitMapping
 from sbmlsim.simulation import Timecourse as Timecourse_sbmlsim
 
+class Intervention:
+    name: str
+    substance: str
+    dose: float
+    unit: str
+    route: str
 
-class Value():
-    _keys: List[str] = [
+    def __init__(self, intervention):
+        self.name = intervention["substance"]
+        self.substance = intervention["substance"]
+        self.dose = intervention["dose"]
+        self.unit = intervention["unit"]
+        self.route = intervention["route"]
 
-        "value",
-        "value_err",
-        "unit",
-        "meta_data",
-    ]
-    def __init__(self, value: float, value_err: float, unit: str, meta: MetaData):
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        if self.name != other.name:
+            return False
+        if self.substance != other.substance:
+            return False
+        if self.route != other.route:
+            return False
+        if Quantity(self.dose, self.unit) != Quantity(other.dose, other.unit):
+            return False
+        return True
 
-        self.value = value
-        self.value_err = value_err
-        self.unit = unit
-        self.meta = meta
+    def __str__(self):
+        """Get string representation."""
+        return f"{self.substance}_{self.dose}{self.unit}_{self.route}"
 
 
-class XY:
-    x: Value
-    y: Value
+class Group(BaseModel):
+    name: str
+    count: int
+
+    def __init__(self, name, count, **data: Any):
+        super().__init__(**data)
+        self.name = name
+        self.count = count
+
+    def __str__(self):
+        """Get string representation."""
+        return f"{self.name}_({self.count})"
+
+
+class Individual(BaseModel):
+    name: str
+    group: Group
+
+    def __init__(self, name, group, **data: Any):
+        super().__init__(**data)
+        self.name = name
+        self.group = group
+
+    def __str__(self):
+        """Get string representation."""
+        return f"{self.name}_({self.group.name})"
+
+
+class Task:
+    interventions: List[Intervention]
+    tcsim: TimecourseSim
+
+    def __init__(
+        self,
+        intervention_set: List[Intervention],
+        t0: float = 0,
+        t_end=24,
+        key_mapping=None,
+        steps_per_min=1,
+    ):
+        self.observable = Observable
+        self.interventions = intervention_set
+        self.tcsim = TimecourseSim
+        changes = self.default_changes()
+        for intervention in intervention_set:
+            # TODO: add dmthbr -> dmt conversion somewhere
+            DOSE = Quantity(intervention.dose, intervention.unit)
+            changes[
+                f"{key_mapping.route_mapping[intervention.route]}DOSE_{key_mapping.task_mapping[intervention.substance]}"
+            ] = DOSE
+        steps = int(t_end * 3600 * steps_per_min)
+        self.tcsim = TimecourseSim(
+            timecourses=Timecourse_sbmlsim(
+                start=t0, end=t_end, steps=steps, changes=changes
+            )
+
+        )
+
+
+
+    def default_changes(self):
+        return {}
+
+    def __repr__(self):
+        return self.__str__()
+
+    def __str__(self):
+        """Get string representation."""
+        return f"task_{self.interventions}"
+
 
 class MetaData:
     group: Group
@@ -125,103 +207,21 @@ class Timecourse:
         raise NotImplementedError
 
 
-class Intervention:
-    name: str
-    substance: str
-    dose: float
-    unit: str
-    route: str
+class Data:
+    _keys: List[str] = [
 
-    def __init__(self, intervention):
-        self.name = intervention["substance"]
-        self.substance = intervention["substance"]
-        self.dose = intervention["dose"]
-        self.unit = intervention["unit"]
-        self.route = intervention["route"]
+        "value",
+        "value_err",
+        "unit",
+        "meta",
+    ]
+    def __init__(self, value: float, value_err: float, unit: str, meta: MetaData):
 
-    def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            return False
-        if self.name != other.name:
-            return False
-        if self.substance != other.substance:
-            return False
-        if self.route != other.route:
-            return False
-        if Quantity(self.dose, self.unit) != Quantity(other.dose, other.unit):
-            return False
-        return True
+        self.value = value
+        self.value_err = value_err
+        self.unit = unit
+        self.meta = meta
 
-    def __str__(self):
-        """Get string representation."""
-        return f"{self.substance}_{self.dose}{self.unit}_{self.route}"
-
-
-class Group(BaseModel):
-    name: str
-    count: int
-
-    def __init__(self, name, count, **data: Any):
-        super().__init__(**data)
-        self.name = name
-        self.count = count
-
-    def __str__(self):
-        """Get string representation."""
-        return f"{self.name}_({self.count})"
-
-
-class Individual(BaseModel):
-    name: str
-    group: Group
-
-    def __init__(self, name, group, **data: Any):
-        super().__init__(**data)
-        self.name = name
-        self.group = group
-
-    def __str__(self):
-        """Get string representation."""
-        return f"{self.name}_({self.group.name})"
-
-
-class Task:
-    interventions: List[Intervention]
-    tcsim: TimecourseSim
-
-    def __init__(
-        self,
-        intervention_set: List[Intervention],
-        t0: float = 0,
-        t_end=24,
-        key_mapping=None,
-        steps_per_min=1,
-    ):
-        self.interventions = intervention_set
-        changes = self.default_changes()
-        for intervention in intervention_set:
-            # TODO: add dmthbr -> dmt conversion somewhere
-            DOSE = Quantity(intervention.dose, intervention.unit)
-            changes[
-                f"{key_mapping.route_mapping[intervention.route]}DOSE_{key_mapping.task_mapping[intervention.substance]}"
-            ] = DOSE
-
-        steps = int(t_end * 3600 * steps_per_min)
-        self.tcsim = TimecourseSim(
-            timecourses=Timecourse_sbmlsim(
-                start=t0, end=t_end, steps=steps, changes=changes
-            )
-        )
-
-    def default_changes(self):
-        return {}
-
-    def __repr__(self):
-        return self.__str__()
-
-    def __str__(self):
-        """Get string representation."""
-        return f"task_{self.interventions}"
 
 
 class TimecourseMetaData:
@@ -295,14 +295,12 @@ class Observable:
 
 
 class Mapping:
-    task: Task
-    data: TimecourseMetaData
-    observable: Observable
-    mapping: FitMapping
 
-    def __init__(self, data: TimecourseMetaData, mapping: KeyMappings = None):
+    def __init__(self, data: Data, task: Task, observable: Observable):
         self.data = data
-        self.task = self.task
+        self.task = task
+        self.observable = observable
+
         # self.observable = Observable(
         #     utils.metadata_to_key(data, mapping), data.timecourse.unit
         # )

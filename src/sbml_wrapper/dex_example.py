@@ -23,6 +23,9 @@ task_mapping = {
     "qui": "qui",
     "qui-s": "qui",
 }
+observables = {
+    "[Cve_dex]"
+}
 
 key_mapping = {
     # substances

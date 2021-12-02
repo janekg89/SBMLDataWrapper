@@ -27,9 +27,9 @@ logger = log.get_logger(__name__)
 
 
 class ExperimentFactory:
-    data: List[TimecourseMetaData]
-    tasks: List[Task]
-    mappings: List[Mapping]
+    #data: List[TimecourseMetaData]
+    #tasks: List[Task]
+    #mappings: List[Mapping]
 
     def __init__(self, sid: str, zip_path: Path, key_mapping):
         self.sid = sid
@@ -48,7 +48,6 @@ class ExperimentFactory:
         self.create_tasks()
         self.create_mappings()
         # self.initialize()
-
 
     def create_data(self):
         data_dict = {"timecourses": self.create_timecourse_data()}
@@ -76,12 +75,24 @@ class ExperimentFactory:
 
             self.data.append(tc_metadata)
 
-    def create_tasks(self):
+    def create_tasks(self) -> List[Task]:
         """Creates the task objects."""
-        pass
+        raise NotImplementedError
+
+    def create_task(self) -> Task:
+        """Creates one task object."""
+        raise NotImplementedError
+
+    def create_mapping(self) -> Mapping:
+        data = self.get_data()
+        data = self.observable()
+        return Mapping(data=data)
 
     def create_mappings(self):
         """Creates the mapping objects."""
+        task = self.get_task()
+
+
         pass
 
     def initialize(self):
