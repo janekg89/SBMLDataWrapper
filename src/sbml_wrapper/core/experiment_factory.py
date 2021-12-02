@@ -13,7 +13,7 @@ from pkdb_analysis.data import PKData, PKDataFrame
 
 from sbmlutils import log
 from sbmlsim.experiment import SimulationExperiment
-from src.datawrapper.core.objects import (
+from src.sbml_wrapper.core.objects import (
     Timecourse,
     TimecourseMetaData,
     Task,
@@ -47,12 +47,18 @@ class ExperimentFactory:
         self.create_data()
         self.create_tasks()
         self.create_mappings()
-
         # self.initialize()
 
+
     def create_data(self):
+        data_dict = {"timecourses": self.create_timecourse_data()}
+        return data_dict
+
+    def create_timecourse_data(self):
         """Creates the data objects."""
+
         for index, pkdb_tc in self.pkdata.timecourses.iterrows():
+            #timecourse_outputs = self.pkdata.outputs.df[self.pkdata.outputs["output_pk"].isin(pkdb_tc.output_pk)]
             timecourse = Timecourse(pkdb_tc)
             logger.info(timecourse)
 
@@ -91,11 +97,12 @@ class ExperimentFactory:
                 self.tasks.append(
                     Task(dset.interventions, key_mapping=self.key_mapping)
                 )
-            for task in self.tasks:
-                if task.interventions == dset.interventions:
-                    # assigns a task to each timecourse (and later also output)
-                    dset.set_task(task)
-                    break
+
+            # for task in self.tasks:
+            #     if task.interventions == dset.interventions:
+            #         # assigns a task to each timecourse (and later also output)
+            #         dset.set_task(task)
+            #         break
             # initialise Mapping objects
             self.mappings.append(Mapping(dset, mapping=self.key_mapping))
 

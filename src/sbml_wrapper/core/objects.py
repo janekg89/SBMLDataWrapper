@@ -19,6 +19,61 @@ from sbmlsim.fit import FitMapping
 from sbmlsim.simulation import Timecourse as Timecourse_sbmlsim
 
 
+class Value():
+    _keys: List[str] = [
+
+        "value",
+        "value_err",
+        "unit",
+        "meta_data",
+    ]
+    def __init__(self, value: float, value_err: float, unit: str, meta: MetaData):
+
+        self.value = value
+        self.value_err = value_err
+        self.unit = unit
+        self.meta = meta
+
+
+class XY:
+    x: Value
+    y: Value
+
+class MetaData:
+    group: Group
+    individual: Individual
+    interventions: List[Intervention]
+    tissue: str
+    substance: str
+
+    def __init__(
+        self,
+        group: Group,
+        individual: Individual,
+        interventions: List[Intervention],
+    ):
+        self.group = group
+        self.individual = individual
+        self.interventions = interventions
+
+    def __str__(self):
+        """Get string representation."""
+        info = [
+            "-" * 80,
+            f"TimecourseMetaData:",
+            "-" * 80,
+            f"{'Group':20} {self.group}",
+            f"{'Individual':20} {self.individual}",
+            f"{'Interventions':20} {self.interventions}",
+            f"{'Tissue':20} {self.tissue}",
+            f"{'Substance':20} {self.substance}",
+        ]
+        return "\n".join(info)
+
+
+
+
+
 class Timecourse:
     _keys: List[str] = [
         "label",
@@ -200,7 +255,7 @@ class TimecourseMetaData:
             f"{'Interventions':20} {self.interventions}",
             f"{'Tissue':20} {self.tissue}",
             f"{'Substance':20} {self.substance}",
-            f"{'Task':20} {self.task}",
+            #f"{'Task':20} {self.task}",
         ]
         return "\n".join(info)
 
@@ -247,7 +302,7 @@ class Mapping:
 
     def __init__(self, data: TimecourseMetaData, mapping: KeyMappings = None):
         self.data = data
-        self.task = data.task
+        self.task = self.task
         # self.observable = Observable(
         #     utils.metadata_to_key(data, mapping), data.timecourse.unit
         # )

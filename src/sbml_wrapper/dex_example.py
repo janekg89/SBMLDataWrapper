@@ -61,18 +61,25 @@ dex_mapping = KeyMappings(
 dex_mapping.set_key_mapping(key_mapping)
 
 if __name__ == "__main__":
-    from pkdb_models.models.dextromethorphan import PKDATA_ZIP_PATH
-    print(type(PKDATA_ZIP_PATH))
+    #from pkdb_models.models.dextromethorphan import PKDATA_ZIP_PATH
+    #print(type(PKDATA_ZIP_PATH))
 
     # FIXME: this is a hack to avoid dependency hell
+    #PKDATA_ZIP_PATH = Path(
+    #    "/home/janosch/Coding/Work/Matthias/pkdb_models/pkdb_models/models/dextromethorphan/results/pkdata/pkdb_data.zip"
+    #)
     PKDATA_ZIP_PATH = Path(
-        "/home/janosch/Coding/Work/Matthias/pkdb_models/pkdb_models/models/dextromethorphan/results/pkdata/pkdb_data.zip"
+                "/home/janek/Dev/pkdb_models/pkdb_models/models/dextromethorphan/results/pkdata/pkdb_data.zip"
     )
-    Capon1996 = ExperimentFactory(
-        sid="Capon1996", zip_path=PKDATA_ZIP_PATH, key_mapping=dex_mapping
+    #capon1996 = ExperimentFactory(
+    #    sid="Capon1996", zip_path=PKDATA_ZIP_PATH, key_mapping=dex_mapping
+    #)
+
+    lopez2005 = ExperimentFactory(
+        sid="Lopez2005", zip_path=PKDATA_ZIP_PATH, key_mapping=dex_mapping
     )
+    print(lopez2005)
 
     # TODO: paracetamol example
     # TODO: outputs/correlation
 
-    print(Capon1996)
