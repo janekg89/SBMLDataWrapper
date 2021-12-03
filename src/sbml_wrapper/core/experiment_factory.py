@@ -62,8 +62,8 @@ class ExperimentFactory:
         self.observables: List[Observable] = observables
 
 
-        self.create_tasks()
-        self.create_mappings()
+        #self.create_tasks()
+        #self.create_mappings()
         # self.initialize()
 
 
@@ -71,9 +71,11 @@ class ExperimentFactory:
         # data_dict = {"timecourses": self.create_timecourse_data()}
         #  data_dict
         meta_kwargs = {}
-        subject_pk = output[["group_pk", "individual_pk"]].idxmax()
+        subject_pk = output[["group_pk", "individual_pk"]].astype(int).idxmax()
         if subject_pk == "individual_pk":
-            meta_kwargs["individual"] = self.pkdata.individuals[subject_pk] == output[subject_pk]
+            individual_data = self.pkdata.individuals[self.pkdata.individuals[subject_pk] == output[subject_pk]]
+
+            meta_kwargs["individual"] = Individual(name=individual_data.individual_name.iloc[0])
 
             value = output.value
             value_type = ValueType.VALUE
@@ -86,10 +88,25 @@ class ExperimentFactory:
 
             err_type = output[[ErrType.SD, ErrType.SE, ErrType.CV]].idxmax()
             err = output[err_type]
+            group_data = self.pkdata.groups[self.pkdata.groups[subject_pk] == output[subject_pk]]
+            meta_kwargs["group"] = Group(name=group_data.name, count=group_data.count)
+        interventions_data = self.pkdata.interventions[self.pkdata.interventions["intervention_pk"] == output["intervention_pk"]]
+        interventions=[]
+        for i, intervention_data in interventions_data.iterrows():
+            intervention = Intervention(
+                name=intervention_data["name"],
+                substance=intervention_data["substance"],
+                dose=intervention_data["value"],
+                unit=intervention_data["unit"],
+                route=intervention_data["route"]
+            )
+            interventions.append(intervention)
 
-        #todo: create MetaData
-        meta = MetaData()
-        data = Data(
+        meta_kwargs["interventions"] = interventions
+
+        meta = MetaData(tissue=output["tissue"],substance=output["substance"], **meta_kwargs)
+
+        return Data(
             value=value,
             value_type=value_type,
             err=err,
@@ -97,7 +114,6 @@ class ExperimentFactory:
             unit=output.unit,
             meta=meta
             )
-
 
     def create_data(self) -> List[Data]:
         data  = []
@@ -140,7 +156,7 @@ class ExperimentFactory:
             self.task_interventionset_mapping[intervention_pk] = task.sid
             tasks.append(task)
 
-        raise return tasks
+        return tasks
 
     def create_task(self) -> Task:
         """Creates one task object."""

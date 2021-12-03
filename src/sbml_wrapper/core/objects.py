@@ -7,30 +7,23 @@ Necessary to provide the model and necessary changes.
 from __future__ import annotations
 import json
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
-from pydantic import BaseModel
-
-import numpy as np
+from pydantic import BaseModel, validator
 
 from pint import Quantity
 from sbmlsim.simulation import TimecourseSim
-from sbmlsim.fit import FitMapping
 from sbmlsim.simulation import Timecourse as Timecourse_sbmlsim
 
-class Intervention:
-    name: str
-    substance: str
-    dose: float
-    unit: str
-    route: str
 
-    def __init__(self, intervention):
-        self.name = intervention["substance"]
-        self.substance = intervention["substance"]
-        self.dose = intervention["dose"]
-        self.unit = intervention["unit"]
-        self.route = intervention["route"]
+class Intervention:
+    """ Object representing an intervention. """
+    def __init__(self, name: str, substance:str , dose: str, unit: str, route:str):
+        self.name = name
+        self.substance = substance
+        self.dose = dose
+        self.unit = unit
+        self.route = route
 
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
@@ -54,28 +47,20 @@ class Group(BaseModel):
     name: str
     count: int
 
-    def __init__(self, name, count, **data: Any):
-        super().__init__(**data)
-        self.name = name
-        self.count = count
-
     def __str__(self):
         """Get string representation."""
         return f"{self.name}_({self.count})"
 
 
-class Individual(BaseModel):
-    name: str
-    group: Group
+class Individual:
 
-    def __init__(self, name, group, **data: Any):
+    def __init__(self, name, **data: Any):
         super().__init__(**data)
         self.name = name
-        self.group = group
 
     def __str__(self):
         """Get string representation."""
-        return f"{self.name}_({self.group.name})"
+        return f"{self.name}"
 
 
 class Task:
@@ -121,22 +106,27 @@ class Task:
         return f"task_{self.interventions}"
 
 
-class MetaData:
-    group: Group
-    individual: Individual
+class MetaData(BaseModel):
+    group: Optional[Group]
+    individual: Optional[Individual]
     interventions: List[Intervention]
     tissue: str
     substance: str
 
-    def __init__(
-        self,
-        group: Group,
-        individual: Individual,
-        interventions: List[Intervention],
-    ):
-        self.group = group
-        self.individual = individual
-        self.interventions = interventions
+    class Config:
+        arbitrary_types_allowed = True
+
+    #@validator('group')
+    #def unique_individual_group(cls, v, values, **kwargs):
+    #    group = values.get("group", False)
+    #    individual = values.get("individual", False)
+    #    # xor operator
+    #    if bool(group) == bool(individual):
+    #        raise ValueError('Group or individual is required, not both.')
+    #    return v
+
+
+
 
     def __str__(self):
         """Get string representation."""
