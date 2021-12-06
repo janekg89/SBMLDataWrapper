@@ -5,14 +5,12 @@ Necessary to provide the model and necessary changes.
 
 """
 from pathlib import Path
-from typing import List, Dict
+from typing import List
 
 import numpy as np
 import pandas as pd
-from rich import print
-from pint import Quantity
 
-from pkdb_analysis.data import PKData, PKDataFrame
+from pkdb_analysis.data import PKData
 
 from sbmlutils import log
 from sbmlsim.experiment import SimulationExperiment
@@ -41,9 +39,6 @@ class ErrType:
     CV = "cv"
 
 class ExperimentFactory:
-    #data: List[TimecourseMetaData]
-    #tasks: List[Task]
-    #mappings: List[Mapping]
 
     def __init__(self, sid: str, zip_path: Path, key_mapping, observables):
         self.sid = sid
@@ -56,7 +51,6 @@ class ExperimentFactory:
         self.task_intervention_mapping = {}
 
         self.data: List[Data] = self.create_data()
-
         self.tasks: List[Task] = []
         self.mappings: List[Mapping] = []
         self.observables: List[Observable] = observables
